@@ -986,20 +986,16 @@ void proc_sched_set_task(struct task_struct *p)
 }
 
 /* mosse */
-void mosse_count(struct task_struct *p, struct seq_file *m)
+void mosse_count(struct task_struct *p, struct pid_namespace *ns , struct seq_file *m)
 {
     #define P(F) \
         SEQ_printf(m, "%-21Ld\n", (long long) p->F)
 
     printk("mosse: procfs is great!\n");
 
-    // Get the current running queue
-    struct rq *rq = this_rq();
-    struct task_struct *task = rq->task;
-   
     // Store counter values in procfs  
-    P(task->cpu_cycles_saved);
-    P(task->cpu_instructions_saved);
+    P(p->cpu_cycles_saved);
+    P(p->cpu_instructions_saved);
 
     #undef P
 }

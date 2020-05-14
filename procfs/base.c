@@ -1459,29 +1459,28 @@ static const struct file_operations proc_pid_sched_operations = {
 #endif
 
 /* mosse */
-
 // This function is not used (declared just for reference)
-static ssize_t
-mosse_write(struct file *file, const char __user *buf,
-            size_t count, loff_t *offset)
-{
-    return count;
-}
-
 static int mosse_show(struct seq_file *m, void *v)
 {
     struct inode *inode = m->private;
+	struct pid_namespace *ns = proc_pid_ns(inode);
     struct task_struct *p;
 
     p = get_proc_task(inode);
     if (!p)
         return -ESRCH;
-    mosse_count(p, m);
+    mosse_count(p, ns, m);
 
     put_task_struct(p);
 
     return 0;
 }
+
+static ssize_t mosse_write(struct file *file, const char __user *buf, size_t count, loff_t *offset)
+{
+    return count;
+}
+
 
 static int mosse_open(struct inode *inode, struct file *filp)
 {
@@ -3052,8 +3051,11 @@ static const struct pid_entry tgid_base_stuff[] = {
 	ONE("personality", S_IRUSR, proc_pid_personality),
 	ONE("limits",	  S_IRUGO, proc_pid_limits),
 #ifdef CONFIG_SCHED_DEBUG
-	REG("sched",      S_IRUGO|S_IWUSR, proc_pid_sched_operations),
+	REG("sched",      S_IRUGO |S_IWUSR, proc_pid_sched_operations),
 #endif
+    /* mosse */
+	REG("mosse",      S_IRUGO, mosse_operations),
+    /* mosse end */
 #ifdef CONFIG_SCHED_AUTOGROUP
 	REG("autogroup",  S_IRUGO|S_IWUSR, proc_pid_sched_autogroup_operations),
 #endif
@@ -3453,6 +3455,9 @@ static const struct pid_entry tid_base_stuff[] = {
 #ifdef CONFIG_SCHED_DEBUG
 	REG("sched",     S_IRUGO|S_IWUSR, proc_pid_sched_operations),
 #endif
+    /* mosse */
+	REG("mosse",     S_IRUGO, mosse_operations),
+    /* mosse end */
 	NOD("comm",      S_IFREG|S_IRUGO|S_IWUSR,
 			 &proc_tid_comm_inode_operations,
 			 &proc_pid_set_comm_operations, {}),

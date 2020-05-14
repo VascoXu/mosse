@@ -230,10 +230,6 @@ extern void io_schedule_finish(int token);
 extern long io_schedule_timeout(long timeout);
 extern void io_schedule(void);
 
-/* mosse */
-extern void mosse_count(struct task_struct *p, struct seq_file *m);
-/* mosse end */
-
 /**
  * struct prev_cputime - snapshot of system and user cputime
  * @utime: time spent in user mode
