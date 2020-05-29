@@ -537,15 +537,14 @@ __notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
    cycles_count = get_cycle_counter();
    
    // Save history of counter to use in next context switch
-   if (fair_policy(next->policy && instr_count != 0 && cycles_count != 0)) {
+   if (fair_policy(next->policy) && instr_count != 0 && cycles_count != 0) {
       next->cpu_cycles_saved = cycles_count;
       next->cpu_instructions_saved = instr_count;
    }
 
    long instr_total = 0;
    long cycles_total = 0;
-   if (fair_policy(prev->policy) && prev->cpu_cycles_saved && 
-      prev->cpu_instructions_saved != 0) {
+   if (fair_policy(prev->policy) && prev->cpu_cycles_saved != 0 && prev->cpu_instructions_saved != 0) {
       instr_total = (instr_count - prev->cpu_instructions_saved);
       cycles_total = (cycles_count - prev->cpu_cycles_saved);
    }
