@@ -10,6 +10,10 @@
 
 #include <trace/events/power.h>
 
+/* mosse */
+#include <linux/smp.h>
+/* mosse end */
+
 /* Linker adds these: start and end of __cpuidle functions */
 extern char __cpuidle_text_start[], __cpuidle_text_end[];
 
@@ -348,38 +352,79 @@ void play_idle(unsigned long duration_us)
 EXPORT_SYMBOL_GPL(play_idle);
 
 /* mosse */
-// Enable all counters
-void enable_all_counters(void *info)
+
+// Initialize individual counters
+static inline void init_counters(struct task_struct *tsk)
 {
-   asm volatile("mcr p15, 0, %0, c9, c12, 0" :: "r"(1|8|16));
-   asm volatile("mcr p15, 0, %0, c9, c12, 1" :: "r"(0x8000000f));
+    // Enable 1st counter, if available
+    if (tsk->mosse_counters->c1 > 0) {
+        asm volatile ("MCR p15, 0, %0, C9, C12, 5" :: "r"(0x00));
+        asm volatile ("MCR p15, 0, %0, C9, C13, 1" :: "r"(tsk->mosse_counters->c1));
+    }
+
+    // Enable 2nd counter, if available
+    if (tsk->mosse_counters->c2 > 0) {
+        asm volatile ("MCR p15, 0, %0, C9, C12, 5" :: "r"(0x01));
+        asm volatile ("MCR p15, 0, %0, C9, C13, 1" :: "r"(tsk->mosse_counters->c2));
+    }
+
+    // Enable 3rd counter, if available
+    if (tsk->mosse_counters->c3 > 0) {
+        asm volatile ("MCR p15, 0, %0, C9, C12, 5" :: "r"(0x02));
+        asm volatile ("MCR p15, 0, %0, C9, C13, 1" :: "r"(tsk->mosse_counters->c3));
+    }
+
+    // Enable 4th counter, if available
+    if (tsk->mosse_counters->c4 > 0) {
+        asm volatile ("MCR p15, 0, %0, C9, C12, 5" :: "r"(0x03));
+        asm volatile ("MCR p15, 0, %0, C9, C13, 1" :: "r"(tsk->mosse_counters->c4));
+    }
 }
 
-// Called on each CPU and eables instruction perfomance counters
-void enable_instruction_counter(void *info)
+static inline void init_perfcounters(struct task_struct *tsk)
 {
-   // Setup: select register to program
-   asm volatile("mcr p15, 0, %0, c9, c12, 5" :: "r"(0x00));
-   asm volatile("mcr p15, 0, %0, c9, c13, 1" :: "r"(0x08));
-   printk(KERN_INFO "mosse enabling instruction counter\n");
-}
+    // Enable all counters (including cycle counter)
+    int32_t do_reset = 1;
+    int32_t enable_divider = 0;
+    int32_t value = 1;
 
-void enable_cycle_counter(void *info)
-{
-   // Setup: select register to program
-   asm volatile("mcr p15, 0, %0, c9, c12, 5" :: "r"(0x01));
-   asm volatile("mcr p15, 0, %0, c9, c13, 1" :: "r"(0x08));
-   printk(KERN_INFO "mosse enabling cycle counter\n");
+    // Enable user-mode access to performance counters
+    asm volatile ("MCR p15, 0, %0, C9, C14, 0\n\t" :: "r"(1));
+
+    // Disable counter overflow interrupts
+    // asm volatile ("MCR p15, 0, %0, C9, C14, 2\n\t" :: "r"(0x8000000f));
+
+    // Peform reset  
+    if (do_reset)
+    {
+        value |= 2;     // reset all counters to zero
+        value |= 4;     // reset cycle counter to zero
+    } 
+
+    if (enable_divider)
+        value |= 8;     // enable "by 64" divider for CCNT
+
+    value |= 16;
+
+    // Program the performance-counter control-register
+    asm volatile ("MCR p15, 0, %0, c9, c12, 0\t\n" :: "r"(value));  
+
+    // Enable all counters
+    asm volatile ("MCR p15, 0, %0, c9, c12, 1\t\n" :: "r"(0x8000000f));  
+
+    // Clear overflows
+    asm volatile ("MCR p15, 0, %0, c9, c12, 3\t\n" :: "r"(0x8000000f));
+
+    // Enable mosse counters
+    if (tsk->pid > 1) init_counters(tsk);
 }
 /* mosse end */
 
 void cpu_startup_entry(enum cpuhp_state state)
 {
-   /* mosse */
-   enable_all_counters(NULL);
-   enable_instruction_counter(NULL);
-   enable_cycle_counter(NULL);
-   /* mosse end */
+    /* mosse */
+    init_perfcounters(current);
+    /* mosse end */
 
 	arch_cpu_idle_prepare();
 	cpuhp_online_idle(state);

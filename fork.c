@@ -171,6 +171,11 @@ static inline struct task_struct *alloc_task_struct_node(int node)
 
 static inline void free_task_struct(struct task_struct *tsk)
 {
+    /* mosse */
+    kfree(tsk->mosse_counters);
+    kfree(tsk->mosse_buf1);
+    kfree(tsk->mosse_buf2);
+    /* mosse end */
 	kmem_cache_free(task_struct_cachep, tsk);
 }
 #endif
@@ -1848,10 +1853,20 @@ static __latent_entropy struct task_struct *copy_process(
 	if (!p)
 		goto fork_out;
 
-   /* mosse */
-   p->cpu_cycles_saved = 0;
-   p->cpu_instructions_saved = 0;
-   /* mosse end */
+    /* mosse */
+    p->mosse_counters = kmalloc(sizeof(struct mosse_counters), GFP_ATOMIC); 
+    p->mosse_counters->c1 = 0;
+    p->mosse_counters->c2 = 0;
+    p->mosse_counters->c3 = 0;
+    p->mosse_counters->c4 = 0;
+
+    p->mosse = 0;
+    
+    p->mosse_buf1 = kmalloc(sizeof(struct mosse_buffer), GFP_ATOMIC);
+    p->mosse_buf2 = kmalloc(sizeof(struct mosse_buffer), GFP_ATOMIC);
+    p->mosse_buf1->index = 0;
+    p->mosse_buf2->index = 0;
+    /* mosse end */
 
 	/*
 	 * This _must_ happen before we call free_task(), i.e. before we jump
