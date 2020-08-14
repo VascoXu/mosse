@@ -134,6 +134,8 @@ int main(int argc, char *argv[])
         event = strsep(&events, ",");
         mosse_events[num_events] = event;
     }
+
+    printf("num_events: %d\n", num_events);
     
     // Check for cycles
     int i;
@@ -177,6 +179,7 @@ int main(int argc, char *argv[])
         strcat(outfile, ".txt");
 
         // Store file
+        printf("output_file %s\n", outfile);
         output_filenames[i] = outfile; 
         output_files[i] = fopen(outfile, "w+"); 
     }
@@ -216,13 +219,14 @@ int main(int argc, char *argv[])
             strcat(proc_cmd, map);
             strcat(proc_cmd, part2);
             strcat(proc_cmd, mypid);
-            if (iscycles) {
+            if (iscycles && i == cycles_index) {
                 strcat(proc_cmd, "/mosse_cc\"");
                 iscycles = 0;
             }
             else {
                 strcat(proc_cmd, procs[cmds++]);
             }
+            printf("cmd: %s\n", proc_cmd);
             system(proc_cmd);
         }
 
@@ -259,6 +263,7 @@ int main(int argc, char *argv[])
             else {
                 strcat(counters_filename, procs[files++]);
             }
+            printf("counters_filename: %s\n", counters_filename);
             strncpy(proc_filenames[i], counters_filename, PROC_LENGTH);
         }
        
@@ -308,14 +313,16 @@ int main(int argc, char *argv[])
 
                     // Write time spent to file
                     fprintf(output_files[i], "%f", time_spent);
-
+                    
+                    // Close file
                     fclose(output_files[i]);
 
-                    printf("Performance counter stats for: %s\n", benchmark);
-                    printf("Benchmark Time: %fs\n", time_spent);
-                    exit(0);
                 }
-
+                
+                // Print statistics
+                printf("Performance counter stats for: %s\n", benchmark);
+                printf("Benchmark Time: %fs\n", time_spent);
+                exit(0);
             }
 
             struct timespec ts;
