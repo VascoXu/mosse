@@ -34,6 +34,11 @@ void usage()
     );
 }
 
+void list()
+{
+    printf("List\n");
+}
+
 char **parse_csv(char *events[], int num_events)
 {
     FILE *fp = fopen("armv7_events.csv", "r");
@@ -73,6 +78,12 @@ int main(int argc, char *argv[])
     // Check for usage command
     if (strcmp(argv[1], "usage") == 0) {
         usage();
+        return 0;
+    }
+
+    // Check for list command
+    if (strcmp(argv[1], "list") == 0) {
+        list();
         return 0;
     }
     
@@ -127,9 +138,11 @@ int main(int argc, char *argv[])
     // Check for cycles
     int i;
     int is_cycles = 0;
+    int cycles_index = 0;
     for (i = 0; i < num_events; i++) {
         if (strcmp(mosse_events[i], "cycles") == 0) {
             is_cycles = 1;
+            cycles_index = i;
         }
     }
     
@@ -231,45 +244,28 @@ int main(int argc, char *argv[])
         // Create array of /proc files
         char proc_filenames[num_events][PROC_LENGTH];
         char *procs[] = {"/mosse_c1", "/mosse_c2", "/mosse_c3", "/mosse_c4"};
-        int files;
+        int iscycles = is_cycles;
+        int files = 0;
         int i;
-        for (files = 0, i = 0; i < num_events; i++) {
+        for (i = 0; i < num_events; i++) {
             char counters_filename[PROC_LENGTH];
             char *procfs_path = "/proc/";
             strcpy(counters_filename, procfs_path);
             strcat(counters_filename, mypid);
-            if (is_cycles) {
+            if (iscycles && i == cycles_index) {
                 strcat(counters_filename, "/mosse_cc");
-                is_cycles = 0;
+                iscycles = 0;
             }
             else {
-                strcat(counters_filename, procs[files]);
-                files++;
+                strcat(counters_filename, procs[files++]);
             }
             strncpy(proc_filenames[i], counters_filename, PROC_LENGTH);
         }
-        
-        /*
-        // Write to /proc file to set flag
-        for (i = 0; i < num_events; i++) {
-            char proc_cmd[200];
-            char *part1 = "sudo sh -c \"echo ";
-            char *part2 = " > /proc/";
-            char *part3 = "/mosse_cc\"";
-            char *map = mappings[i];
-
-            strcpy(proc_cmd, part1);
-            strcat(proc_cmd, map);
-            strcat(proc_cmd, part2);
-            strcat(proc_cmd, mypid);
-            strcat(proc_cmd, part3);
-            system(proc_cmd);
-        }
-        */
-
+       
         // Open /proc files
         FILE *counter_files[num_events];
         for (i = 0; i < num_events; i++) {
+            printf("filename: %s\n", proc_filenames[i]);
             FILE *counter_file = fopen(proc_filenames[i], "r");
             if (!counter_file) {
                 printf("Error: could not open /proc file: %s\n", proc_filenames[i]);
@@ -278,6 +274,7 @@ int main(int argc, char *argv[])
         }
 
         // Read indefinitely from /proc, until CTRL-C
+        iscycles = is_cycles;
         while (1) {
             if (waitpid(pid, &status, WNOHANG) != 0) {
                 // End time 
@@ -287,11 +284,20 @@ int main(int argc, char *argv[])
                 double time_spent = (double) (end - begin) / CLOCKS_PER_SEC;
 
                 // Benchmark finished running
-                char *mosse_procs[] = {"/proc/mosse_cc", "/proc/mosse_c2", "/proc/mosse_c3", "/proc/mosse_c4"};
+                char *mosse_procs[] = {"/proc/mosse_c1", "/proc/mosse_c2", "/proc/mosse_c3", "/proc/mosse_c4"};
                 
                 // Read intermediate values
+                int events = 0;
                 for (i = 0; i < num_events; i++) {
-                    FILE *proc_file = fopen(mosse_procs[i], "r");
+                    FILE *proc_file = NULL;
+
+                    // Check for cycles 
+                    if (iscycles && i == cycles_index) {
+                        proc_file = fopen("/proc/mosse_cc", "r");
+                    }
+                    else {
+                        proc_file = fopen(mosse_procs[events++], "r");
+                    }
 
                     char mosse_buf[2200]; // 22 (max length of counter value) * 100 (buffer size)
                     int size = fread(&mosse_buf , 1, sizeof(mosse_buf), proc_file);
